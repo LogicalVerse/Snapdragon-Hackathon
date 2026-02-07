@@ -112,8 +112,15 @@ fun CameraSetupScreen(
     // Camera manager
     val cameraManager = remember { CameraManager(context) }
     
-    // Voice feedback manager
+    // Voice feedback manager - created once per screen instance
     val voiceFeedbackManager = remember { VoiceFeedbackManager(context) }
+    
+    // Session counter - increments each time screen is displayed to force effect re-runs
+    // This ensures recording/pose restart even when isWorkoutStarted doesn't change (resume flow)
+    var sessionId by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        sessionId++
+    }
     
     // UI state
     var showGridOverlay by remember { mutableStateOf(false) }
@@ -166,16 +173,19 @@ fun CameraSetupScreen(
     }
     
     // Start/stop pose estimation and recording based on workout state
-    LaunchedEffect(isWorkoutStarted) {
-        if (isWorkoutStarted) {
+    // Key on sessionId ensures this retriggers on screen resume (when isWorkoutStarted is still true)
+    LaunchedEffect(isWorkoutStarted, sessionId) {
+        if (isWorkoutStarted && sessionId > 0) {
+            // Small delay to ensure camera is fully initialized on resume
+            kotlinx.coroutines.delay(300)
             // Start on-device pose estimation and analysis with correct exercise
             cameraManager.startPoseEstimation(exerciseId = exerciseId)
             // Auto-start video recording
             cameraManager.startRecording()
-            // Reset voice feedback for new workout
+            // Reset voice feedback for new workout session
             voiceFeedbackManager.reset()
             lastRepCount = 0
-        } else {
+        } else if (!isWorkoutStarted) {
             cameraManager.stopPoseEstimation()
             // Stop recording when pausing
             cameraManager.stopRecording()

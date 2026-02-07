@@ -23,25 +23,46 @@ class GeminiRepository(private val context: Context) {
         private const val TAG = "GeminiRepository"
         private const val API_KEY = "AIzaSyBkAKYCgJ7I6veulBF3vxVIF21RHsXpkWM"
         
-        private const val COMPARISON_PROMPT = """You are an expert fitness coach analyzing squat form.
-
-I am sending you images in 3 groups:
-- GROUP 1 (first 6 images): GOOD FORM REFERENCE - Shows correct squat technique
-- GROUP 2 (next 6 images): BAD FORM REFERENCE - Shows common mistakes to avoid
-- GROUP 3 (last 6 images): MY WORKOUT - Frames from my actual squat workout
-
-Compare my workout against BOTH references and provide:
-
-1. MATCHING GOOD FORM: What am I doing correctly like the good reference?
-2. SIMILAR TO BAD FORM: Am I making any mistakes shown in the bad reference?
-3. KEY FIX: One specific tip to improve
-
-Response format (keep SHORT - 3-4 sentences):
-✓ Good: [What matches good form]
-✗ Issue: [What resembles bad form, if any]
-💡 Tip: [One actionable improvement]
-
-Be encouraging but honest."""
+        /**
+         * Build dynamic prompt based on what reference frames are available.
+         * This ensures the prompt matches the actual images being sent.
+         */
+        private fun buildPrompt(
+            hasGoodFormFrames: Boolean,
+            hasBadFormFrames: Boolean,
+            goodCount: Int,
+            badCount: Int,
+            userCount: Int
+        ): String {
+            val totalImages = goodCount + badCount + userCount
+            
+            return buildString {
+                appendLine("You are an expert fitness coach analyzing squat form.")
+                appendLine()
+                appendLine("I am sending you $totalImages images:")
+                
+                var imageIndex = 1
+                if (hasGoodFormFrames) {
+                    appendLine("- Images $imageIndex-${imageIndex + goodCount - 1}: GOOD FORM REFERENCE (correct technique)")
+                    imageIndex += goodCount
+                }
+                if (hasBadFormFrames) {
+                    appendLine("- Images $imageIndex-${imageIndex + badCount - 1}: BAD FORM REFERENCE (mistakes to avoid)")
+                    imageIndex += badCount
+                }
+                appendLine("- Images $imageIndex-${imageIndex + userCount - 1}: MY WORKOUT FRAMES")
+                appendLine()
+                
+                appendLine("Analyze my workout and provide feedback:")
+                appendLine()
+                appendLine("Response format (keep SHORT - 2-3 sentences):")
+                appendLine("✓ Good: [What I'm doing well]")
+                appendLine("⚠ Fix: [Main issue to correct, if any]")
+                appendLine("💡 Tip: [One specific improvement]")
+                appendLine()
+                appendLine("Be encouraging but honest. If form looks good, say so!")
+            }
+        }
     }
     
     // Lazy initialization to prevent crashes during construction
@@ -151,8 +172,18 @@ Be encouraging but honest."""
             // Build request parts
             val parts = mutableListOf<Part>()
             
-            // Add the prompt
-            parts.add(textPart(COMPARISON_PROMPT))
+            // Build dynamic prompt based on what frames we have
+            val prompt = buildPrompt(
+                hasGoodFormFrames = goodFormFrames.isNotEmpty(),
+                hasBadFormFrames = badFormFrames.isNotEmpty(),
+                goodCount = goodFormFrames.size,
+                badCount = badFormFrames.size,
+                userCount = userFrames.size
+            )
+            Log.d(TAG, "Generated prompt: $prompt")
+            
+            // Add the prompt first
+            parts.add(textPart(prompt))
             
             // Add good form frames (GROUP 1 - first 6)
             goodFormFrames.forEachIndexed { index, base64 ->
