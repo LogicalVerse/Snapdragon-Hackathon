@@ -144,21 +144,6 @@ To add new exercises:
 
 ---
 
-## 🧪 Testing
-
-```bash
-# Unit tests
-./gradlew test
-
-# Android instrumentation tests
-./gradlew connectedAndroidTest
-
-# Build debug APK
-./gradlew assembleDebug
-```
-
----
-
 ## 📈 Performance
 
 | Metric | Value |
