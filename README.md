@@ -181,6 +181,16 @@ This project was created for the **Snapdragon Hackathon 2026**.
 
 ---
 
+## Team Members
+
+- Ayush Verma (av3334@columbia.edu)
+- Madhav Tibrewal (madhavtibrewal92@gmail.com)
+- Sanskriti Bansal (sb5215@columbia.edu)
+- Sriya Rallabandi (sriyarallabandi@gmail.com)
+- Tejal Bedmutha (tbedmutha_b19@tx.vjti.ac.in)
+
+---
+
 <p align="center">
   Built with ❤️ for the Snapdragon Hackathon<br>
   <strong>Your AI-Powered Personal Trainer</strong>
