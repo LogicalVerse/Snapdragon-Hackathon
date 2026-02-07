@@ -169,10 +169,10 @@ To add new exercises:
 ## Team Members
 
 - Ayush Verma (av3334@columbia.edu)
-- Madhav Tibrewal (madhavtibrewal92@gmail.com)
+- Madhav Tibrewal (mt3925@columbia.edu)
 - Sanskriti Bansal (sb5215@columbia.edu)
-- Sriya Rallabandi (sriyarallabandi@gmail.com)
-- Tejal Bedmutha (tbedmutha_b19@tx.vjti.ac.in)
+- Sriya Rallabandi (sr4326@columbia.edu)
+- Tejal Bedmutha (tb3206@columbia.edu)
 
 ---
 
