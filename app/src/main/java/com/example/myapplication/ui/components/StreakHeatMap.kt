@@ -116,53 +116,100 @@ fun StreakHeatMap(
             Spacer(modifier = Modifier.height(Spacing.md))
             
             // Heat map grid (Rows=Days, Cols=Weeks)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Day labels (M, T, W...)
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+            Column {
+                // Month labels row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Monday to Sunday
-                    listOf("M", "T", "W", "T", "F", "S", "S").forEach { day ->
-                        Box(
-                            modifier = Modifier.size(16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = day,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MediumGray,
-                                fontSize = 10.sp
-                            )
+                    // Empty space for day labels column
+                    Spacer(modifier = Modifier.width(24.dp))
+                    
+                    // Month labels for each week - show month only when it changes
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        var lastMonth: String? = null
+                        for (week in 0 until 4) {
+                            val weekStartDate = startDate.plusWeeks(week.toLong())
+                            val monthLabel = weekStartDate.month.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+                            
+                            // Only show month if different from previous week
+                            val displayLabel = if (monthLabel != lastMonth) {
+                                lastMonth = monthLabel
+                                monthLabel
+                            } else {
+                                ""  // Empty for duplicate months
+                            }
+                            
+                            Box(
+                                modifier = Modifier.weight(1f),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                Text(
+                                    text = displayLabel,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MediumGray,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                     }
                 }
                 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 
-                // Heat map cells
+                // Days grid
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    for (week in 0 until 4) {
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            for (dayOfWeekOrdinal in 0 until 7) { // 0=Mon, 6=Sun
-                                val cellDate = startDate.plusWeeks(week.toLong()).plusDays(dayOfWeekOrdinal.toLong())
-                                val intensity = history[cellDate] ?: 0
-                                
-                                // Don't show future days if we strictly adhere to "today" clipping? 
-                                // Or show empty. Let's show empty for future.
-                                val isFuture = cellDate.isAfter(today)
-                                HeatMapCell(
-                                    intensity = if (isFuture) 0 else intensity,
-                                    isFuture = isFuture,
-                                    isToday = cellDate.isEqual(today)
+                    // Day labels (M, T, W...)
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        // Monday to Sunday
+                        listOf("M", "T", "W", "T", "F", "S", "S").forEach { day ->
+                            Box(
+                                modifier = Modifier.size(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = day,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MediumGray,
+                                    fontSize = 10.sp
                                 )
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
+                    // Heat map cells
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        for (week in 0 until 4) {
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                for (dayOfWeekOrdinal in 0 until 7) { // 0=Mon, 6=Sun
+                                    val cellDate = startDate.plusWeeks(week.toLong()).plusDays(dayOfWeekOrdinal.toLong())
+                                    val intensity = history[cellDate] ?: 0
+                                    
+                                    // Don't show future days if we strictly adhere to "today" clipping? 
+                                    // Or show empty. Let's show empty for future.
+                                    val isFuture = cellDate.isAfter(today)
+                                    HeatMapCell(
+                                        intensity = if (isFuture) 0 else intensity,
+                                        isFuture = isFuture,
+                                        isToday = cellDate.isEqual(today)
+                                    )
+                                }
                             }
                         }
                     }

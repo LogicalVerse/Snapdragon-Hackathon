@@ -11,7 +11,12 @@ import com.example.myapplication.pose.FeedbackType
 import java.util.Locale
 
 /**
- * Manages voice feedback using Text-to-Speech for hands-free workout coaching.
+ * Simplified voice feedback manager for hands-free workout coaching.
+ * 
+ * Speaks only:
+ * - "Good form" when doing correct pose
+ * - "Correct your form" when doing incorrect pose  
+ * - Rep numbers: "1", "2", "3", etc.
  */
 class VoiceFeedbackManager(context: Context) {
     
@@ -23,11 +28,11 @@ class VoiceFeedbackManager(context: Context) {
     // Main thread handler for TTS calls
     private val mainHandler = Handler(Looper.getMainLooper())
     
-    // Minimum interval between messages to avoid spam
-    private val minIntervalMs = 1500L
+    // Minimum interval between form feedback to avoid spam (3 seconds)
+    private val formFeedbackIntervalMs = 3000L
     
-    // Track last feedback type to avoid repeating
-    private var lastFeedbackType: FeedbackType? = null
+    // Track state
+    private var isCurrentFormGood = true  // Assume good until proven otherwise
     private var lastRepCount = 0
     
     // Audio parameters for TTS
@@ -45,14 +50,13 @@ class VoiceFeedbackManager(context: Context) {
                         Log.e(TAG, "TTS Language not supported, result: $langResult")
                         return@post
                     }
-                    tts?.setSpeechRate(1.0f)
+                    tts?.setSpeechRate(1.1f)  // Slightly faster
                     tts?.setPitch(1.0f)
                     isInitialized = true
-                    Log.d(TAG, "TTS initialized successfully, testing with 'Ready'...")
+                    Log.d(TAG, "TTS initialized successfully")
                     
-                    // Test speak with audio params
-                    val testResult = tts?.speak("Ready", TextToSpeech.QUEUE_ADD, audioParams, "init_test")
-                    Log.d(TAG, "Test speak result: $testResult (0 = SUCCESS)")
+                    // Speak ready message
+                    speak("Ready")
                 } else {
                     Log.e(TAG, "TTS initialization failed with status: $status")
                 }
@@ -61,23 +65,13 @@ class VoiceFeedbackManager(context: Context) {
     }
     
     /**
-     * Speak a message with optional priority.
-     * Priority messages interrupt current speech.
+     * Speak a message.
      */
-    fun speak(message: String, priority: Boolean = false) {
-        Log.d(TAG, "speak() called: '$message', initialized=$isInitialized, priority=$priority")
+    private fun speak(message: String, priority: Boolean = false) {
+        Log.d(TAG, "speak() called: '$message', initialized=$isInitialized")
         
         if (!isInitialized || message.isBlank()) {
-            Log.w(TAG, "TTS not ready or message blank. Initialized: $isInitialized")
-            return
-        }
-        
-        val currentTime = System.currentTimeMillis()
-        
-        // Check if we should speak (avoid spam) - but always allow priority
-        if (!priority && message == lastSpokenMessage && 
-            (currentTime - lastSpeakTimeMs) < minIntervalMs) {
-            Log.d(TAG, "Skipping duplicate message: $message")
+            Log.w(TAG, "TTS not ready or message blank")
             return
         }
         
@@ -94,87 +88,60 @@ class VoiceFeedbackManager(context: Context) {
         }
         
         lastSpokenMessage = message
-        lastSpeakTimeMs = currentTime
+        lastSpeakTimeMs = System.currentTimeMillis()
     }
     
     /**
-     * Speak feedback based on FeedbackType.
-     * Only speaks if feedback type changed (to avoid repeating).
+     * Simplified feedback based on FeedbackType.
+     * Only says "Good form" or "Correct your form"
      */
     fun speakFeedback(feedbackType: FeedbackType) {
-        Log.d(TAG, "speakFeedback() called: $feedbackType, last=$lastFeedbackType")
+        Log.d(TAG, "speakFeedback() called: $feedbackType")
         
         if (!isInitialized) {
             Log.w(TAG, "TTS not initialized, skipping feedback")
             return
         }
         
-        // Don't repeat the same feedback
-        if (feedbackType == lastFeedbackType) {
-            return
-        }
-        
-        // Skip NONE and READY feedback types (too frequent / not actionable)
+        // Skip these - no action needed
         if (feedbackType == FeedbackType.NONE || feedbackType == FeedbackType.READY) {
             return
         }
         
-        lastFeedbackType = feedbackType
+        val currentTime = System.currentTimeMillis()
+        val timeSinceLastFeedback = currentTime - lastSpeakTimeMs
         
-        val message = getFeedbackMessage(feedbackType)
+        // Determine if current form is good or bad
+        val isGoodForm = feedbackType == FeedbackType.GOOD_FORM || feedbackType == FeedbackType.REP_COMPLETE
         
-        if (message != null) {
-            Log.d(TAG, "Feedback: $feedbackType -> '$message'")
-            speak(message, priority = feedbackType == FeedbackType.GOOD_FORM)
-        }
-    }
-    
-    private fun getFeedbackMessage(feedbackType: FeedbackType): String? {
-        return when (feedbackType) {
-            // Squat feedback
-            FeedbackType.BEND_FORWARD -> "Lean forward"
-            FeedbackType.BEND_BACKWARDS -> "Straighten your back"
-            FeedbackType.LOWER_HIPS -> "Go deeper"
-            FeedbackType.KNEE_OVER_TOES -> "Knees over toes"
-            FeedbackType.DEEP_SQUAT -> "Too deep"
-            FeedbackType.GOOD_FORM -> "Good form"
+        // Only speak if:
+        // 1. Form state changed (good -> bad or bad -> good)
+        // 2. OR enough time has passed since last feedback
+        if (isGoodForm != isCurrentFormGood || timeSinceLastFeedback >= formFeedbackIntervalMs) {
+            isCurrentFormGood = isGoodForm
             
-            // Push-up feedback
-            FeedbackType.HIPS_TOO_HIGH -> "Lower your hips"
-            FeedbackType.HIPS_TOO_LOW -> "Raise your hips"
-            FeedbackType.ARMS_NOT_LOCKED -> "Extend arms fully"
-            FeedbackType.ELBOWS_FLARED -> "Tuck elbows in"
-            
-            // Deadlift feedback
-            FeedbackType.ROUND_BACK -> "Keep back straight"
-            FeedbackType.HIPS_TOO_EARLY -> "Hips rising too fast"
-            FeedbackType.BAR_AWAY -> "Keep bar close"
-            
-            // Bench/Row feedback
-            FeedbackType.ELBOWS_TOO_WIDE -> "Tuck elbows more"
-            FeedbackType.INCOMPLETE_LOCKOUT -> "Lock out fully"
-            FeedbackType.MOMENTUM -> "Control the movement"
-            
-            // General
-            FeedbackType.FRONTAL_WARNING -> "Turn to side view"
-            FeedbackType.POSITION_BODY -> "Position full body in frame"
-            FeedbackType.REP_COMPLETE -> "Good rep"
-            
-            // Skip these
-            FeedbackType.NONE, FeedbackType.READY -> null
+            if (isGoodForm) {
+                Log.d(TAG, ">>> Speaking: Good form")
+                speak("Good form", priority = true)
+            } else {
+                Log.d(TAG, ">>> Speaking: Correct your form")
+                speak("Correct your form", priority = false)
+            }
         }
     }
     
     /**
      * Announce rep count when it changes.
+     * Just says the number: "1", "2", "3", etc.
      */
-    fun announceRep(repCount: Int, isCorrect: Boolean) {
+    fun announceRep(repCount: Int, isCorrect: Boolean = true) {
         Log.d(TAG, "announceRep() called: count=$repCount, lastCount=$lastRepCount")
         
         if (!isInitialized) {
             Log.w(TAG, "TTS not initialized, skipping rep announcement")
             return
         }
+        
         if (repCount == lastRepCount || repCount == 0) {
             return
         }
@@ -189,9 +156,10 @@ class VoiceFeedbackManager(context: Context) {
      * Reset feedback tracking (for new workout).
      */
     fun reset() {
-        lastFeedbackType = null
+        isCurrentFormGood = true
         lastRepCount = 0
         lastSpokenMessage = null
+        lastSpeakTimeMs = 0L
         Log.d(TAG, "VoiceFeedbackManager reset")
     }
     

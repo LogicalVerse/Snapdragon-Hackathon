@@ -53,6 +53,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.LaunchedEffect
+
+import com.example.myapplication.network.GeminiRepository
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 
 /**
  * Analysis Screen - Shows detailed workout summary with Resume and End Workout options
@@ -141,9 +146,15 @@ fun AnalysisScreen(
                     context = context
                 )
                 Spacer(modifier = Modifier.height(Spacing.lg))
-                
-
+                }
             
+            // AI Coaching Card (analyze video with Gemini)
+            if (videoUri != null) {
+                AiCoachingCard(
+                    videoUri = videoUri,
+                    context = context
+                )
+                Spacer(modifier = Modifier.height(Spacing.lg))
             }
             
             // Form Score Card
@@ -627,3 +638,134 @@ private fun RepDetailRow(rep: RepInfo) {
 
 
 
+/**
+ * AI Coaching Card - Displays Gemini AI feedback comparing user form to professional reference
+ */
+@Composable
+fun AiCoachingCard(
+    videoUri: String,
+    context: android.content.Context,
+    modifier: Modifier = Modifier
+) {
+    var feedbackState by remember { mutableStateOf<AiFeedbackState>(AiFeedbackState.Loading) }
+    
+    // Safely create repository - catch any initialization errors
+    val geminiRepository = remember {
+        try {
+            GeminiRepository(context)
+        } catch (e: Exception) {
+            android.util.Log.e("AiCoachingCard", "Failed to create repository", e)
+            null
+        }
+    }
+    
+    // Start analysis when component is displayed
+    LaunchedEffect(videoUri) {
+        try {
+            if (geminiRepository == null) {
+                feedbackState = AiFeedbackState.Error("Oops! AI coach unavailable")
+                return@LaunchedEffect
+            }
+            
+            feedbackState = AiFeedbackState.Loading
+            val result = geminiRepository.analyzeSquatForm(videoUri)
+            feedbackState = result.fold(
+                onSuccess = { AiFeedbackState.Success(it) },
+                onFailure = { AiFeedbackState.Error(it.message ?: "Analysis failed") }
+            )
+        } catch (e: Exception) {
+            // Catch any uncaught exception to prevent crash
+            android.util.Log.e("AiCoachingCard", "Analysis crashed", e)
+            feedbackState = AiFeedbackState.Error("Oops! Analysis unavailable")
+        }
+    }
+    
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF1A237E).copy(alpha = 0.2f)  // Deep blue tint
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Spacing.lg)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "🤖",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Spacer(modifier = Modifier.width(Spacing.sm))
+                Text(
+                    text = "AI Coach Feedback",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(Spacing.md))
+            
+            when (val state = feedbackState) {
+                is AiFeedbackState.Loading -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Simple text loading indicator (avoids Compose version conflicts)
+                        Text(
+                            text = "⏳",
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        Spacer(modifier = Modifier.width(Spacing.md))
+                        Text(
+                            text = "Analyzing your form...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                is AiFeedbackState.Success -> {
+                    Text(
+                        text = state.feedback,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.3f
+                    )
+                }
+                is AiFeedbackState.Error -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(Spacing.sm))
+                        Text(
+                            text = "Could not analyze: ${state.message}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * State for AI feedback loading
+ */
+sealed class AiFeedbackState {
+    object Loading : AiFeedbackState()
+    data class Success(val feedback: String) : AiFeedbackState()
+    data class Error(val message: String) : AiFeedbackState()
+}
