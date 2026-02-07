@@ -166,6 +166,16 @@ To add new exercises:
 
 ---
 
+## Team Members
+
+- Ayush Verma (av3334@columbia.edu)
+- Madhav Tibrewal (madhavtibrewal92@gmail.com)
+- Sanskriti Bansal (sb5215@columbia.edu)
+- Sriya Rallabandi (sriyarallabandi@gmail.com)
+- Tejal Bedmutha (tbedmutha_b19@tx.vjti.ac.in)
+
+---
+
 ## 📄 License
 
 This project was created for the **Snapdragon Hackathon 2026**.
@@ -178,16 +188,6 @@ This project was created for the **Snapdragon Hackathon 2026**.
 - [MediaPipe](https://developers.google.com/mediapipe) - Pose detection
 - [Qualcomm Snapdragon](https://www.qualcomm.com/snapdragon) - NPU acceleration
 - [LearnOpenCV](https://learnopencv.com/) - AI Fitness Trainer reference
-
----
-
-## Team Members
-
-- Ayush Verma (av3334@columbia.edu)
-- Madhav Tibrewal (madhavtibrewal92@gmail.com)
-- Sanskriti Bansal (sb5215@columbia.edu)
-- Sriya Rallabandi (sriyarallabandi@gmail.com)
-- Tejal Bedmutha (tbedmutha_b19@tx.vjti.ac.in)
 
 ---
 
