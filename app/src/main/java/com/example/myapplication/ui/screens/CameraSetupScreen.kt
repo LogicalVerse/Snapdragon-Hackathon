@@ -78,7 +78,12 @@ import com.example.myapplication.ui.theme.OffWhite
 import com.example.myapplication.ui.theme.Spacing
 import com.example.myapplication.ui.theme.SubtleGray
 import com.example.myapplication.ui.components.SimplifiedPoseOverlay
+import com.example.myapplication.ui.components.RealTimeAnalysisOverlay
+import com.example.myapplication.pose.AnalysisResult
+import com.example.myapplication.pose.FeedbackType
 import com.example.myapplication.pose.PoseLandmark
+import com.example.myapplication.pose.WorkoutSummary
+import com.example.myapplication.audio.VoiceFeedbackManager
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -91,10 +96,11 @@ import com.google.accompanist.permissions.shouldShowRationale
 @Composable
 fun CameraSetupScreen(
     isWorkoutStarted: Boolean = false,
+    exerciseId: String = "squats",
     onBackPressed: () -> Unit = {},
     onHelpPressed: () -> Unit = {},
     onStartWorkout: () -> Unit = {},
-    onPauseWorkout: () -> Unit = {}
+    onPauseWorkout: (WorkoutSummary, String?) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -106,6 +112,9 @@ fun CameraSetupScreen(
     // Camera manager
     val cameraManager = remember { CameraManager(context) }
     
+    // Voice feedback manager
+    val voiceFeedbackManager = remember { VoiceFeedbackManager(context) }
+    
     // UI state
     var showGridOverlay by remember { mutableStateOf(false) }
     var showPositioningGuide by remember { mutableStateOf(false) }
@@ -113,6 +122,8 @@ fun CameraSetupScreen(
     var autoHideControls by remember { mutableStateOf(false) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var detectedLandmarks by remember { mutableStateOf<List<PoseLandmark>>(emptyList()) }
+    var analysisResult by remember { mutableStateOf<AnalysisResult?>(null) }
+    var lastRepCount by remember { mutableStateOf(0) }
     
     // Preview view
     val previewView = remember {
@@ -136,15 +147,40 @@ fun CameraSetupScreen(
         cameraManager.onPoseDetected = { landmarks ->
             detectedLandmarks = landmarks
         }
+        cameraManager.onAnalysisResult = { result ->
+            analysisResult = result
+            
+            // Voice feedback
+            if (isWorkoutStarted && result != null) {
+                // Announce rep count changes
+                val newRepCount = result.repCount
+                if (newRepCount > lastRepCount) {
+                    voiceFeedbackManager.announceRep(newRepCount, result.correctCount > 0)
+                    lastRepCount = newRepCount
+                }
+                
+                // Speak form feedback
+                voiceFeedbackManager.speakFeedback(result.feedbackType)
+            }
+        }
     }
     
-    // Start/stop pose estimation based on workout state
+    // Start/stop pose estimation and recording based on workout state
     LaunchedEffect(isWorkoutStarted) {
         if (isWorkoutStarted) {
-            cameraManager.startPoseEstimation()
+            // Start on-device pose estimation and analysis with correct exercise
+            cameraManager.startPoseEstimation(exerciseId = exerciseId)
+            // Auto-start video recording
+            cameraManager.startRecording()
+            // Reset voice feedback for new workout
+            voiceFeedbackManager.reset()
+            lastRepCount = 0
         } else {
             cameraManager.stopPoseEstimation()
+            // Stop recording when pausing
+            cameraManager.stopRecording()
             detectedLandmarks = emptyList()
+            analysisResult = null
         }
     }
     
@@ -169,6 +205,7 @@ fun CameraSetupScreen(
     DisposableEffect(Unit) {
         onDispose {
             cameraManager.shutdown()
+            voiceFeedbackManager.shutdown()
         }
     }
     
@@ -197,6 +234,12 @@ fun CameraSetupScreen(
                     modifier = Modifier.fillMaxSize(),
                     mirrorHorizontally = isUsingFrontCamera
                 )
+                
+                // Real-time analysis overlay with rep count, feedback, etc.
+                RealTimeAnalysisOverlay(
+                    analysisResult = analysisResult,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         } else {
             // Permission not granted - show request UI
@@ -212,19 +255,30 @@ fun CameraSetupScreen(
             GridOverlay(modifier = Modifier.fillMaxSize())
         }
         
-        // Top Bar
-        CameraTopBar(
-            onBackPressed = onBackPressed,
-            onHelpPressed = onHelpPressed,
-            onGridToggle = { showGridOverlay = !showGridOverlay },
-            isGridVisible = showGridOverlay,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding())
-        )
+        // Top Bar - hide during workout to not block analysis overlay
+        AnimatedVisibility(
+            visible = !isWorkoutStarted && !autoHideControls,
+            enter = slideInVertically(),
+            exit = slideOutVertically(),
+            modifier = Modifier.align(Alignment.TopStart)
+        ) {
+            CameraTopBar(
+                onBackPressed = onBackPressed,
+                onHelpPressed = onHelpPressed,
+                onGridToggle = { showGridOverlay = !showGridOverlay },
+                isGridVisible = showGridOverlay,
+                modifier = Modifier
+                    .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding())
+            )
+        }
         
-        // Camera Switch Button (top right - below top bar)
-        if (cameraPermission.status.isGranted && !autoHideControls) {
+        // Camera Switch Button (top right) - hide during workout
+        AnimatedVisibility(
+            visible = cameraPermission.status.isGranted && !autoHideControls && !isWorkoutStarted,
+            enter = slideInVertically(),
+            exit = slideOutVertically(),
+            modifier = Modifier.align(Alignment.TopEnd)
+        ) {
             val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
             IconButton(
                 onClick = {
@@ -232,7 +286,6 @@ fun CameraSetupScreen(
                     cameraManager.switchCamera(lifecycleOwner, previewView)
                 },
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
                     .padding(top = statusBarPadding + 56.dp, end = 16.dp)
                     .size(48.dp)
                     .clip(CircleShape)
@@ -276,7 +329,14 @@ fun CameraSetupScreen(
             CameraBottomPanel(
                 isWorkoutStarted = isWorkoutStarted,
                 onStartWorkout = onStartWorkout,
-                onPauseWorkout = onPauseWorkout,
+                onPauseWorkout = {
+                    // Get summary before stopping
+                    val summary = cameraManager.getSummary()
+                    // Stop recording and wait for finalization with callback
+                    cameraManager.stopRecordingWithCallback { videoUri ->
+                        onPauseWorkout(summary, videoUri)
+                    }
+                },
                 onShowPositioningGuide = { showPositioningGuide = true },
                 isUsingFrontCamera = isUsingFrontCamera,
                 modifier = Modifier.align(Alignment.BottomCenter)

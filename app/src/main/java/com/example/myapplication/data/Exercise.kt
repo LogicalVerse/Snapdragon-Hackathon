@@ -87,7 +87,19 @@ object SampleExercises {
         lastPerformed = "1 week ago",
         personalRecord = "300 lbs"
     )
+    
+    val bicepCurl = Exercise(
+        id = "bicep_curl",
+        name = "Bicep Curls",
+        description = "Isolation exercise for biceps",
+        imageRes = R.drawable.ic_rows, // Reuse icon for now
+        difficulty = ExerciseDifficulty.BEGINNER,
+        muscleGroups = listOf(MusclGroup.BICEPS),
+        isAvailable = true,
+        lastPerformed = null,
+        personalRecord = "40 lbs"
+    )
 
-    val all = listOf(squats, pushups, deadlifts, benchPress, rows)
+    val all = listOf(squats, pushups, deadlifts, benchPress, rows, bicepCurl)
     val available = all.filter { it.isAvailable }
 }

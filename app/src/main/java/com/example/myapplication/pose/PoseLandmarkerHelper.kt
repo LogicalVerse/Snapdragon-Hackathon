@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.os.SystemClock
 import android.util.Log
 import com.google.mediapipe.framework.image.BitmapImageBuilder
+import com.google.mediapipe.tasks.components.containers.NormalizedLandmark
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.core.Delegate
 import com.google.mediapipe.tasks.vision.core.RunningMode
@@ -86,7 +87,11 @@ class PoseLandmarkerHelper(
         val finishTimeMs = SystemClock.uptimeMillis()
         
         if (result.landmarks().isNotEmpty()) {
-            val landmarks = result.landmarks()[0].map { landmark ->
+            // Get raw MediaPipe landmarks for server communication
+            val rawLandmarks: List<NormalizedLandmark> = result.landmarks()[0]
+            
+            // Convert to our PoseLandmark format for local processing
+            val landmarks = rawLandmarks.map { landmark ->
                 PoseLandmark(
                     x = landmark.x(),
                     y = landmark.y(),
@@ -95,7 +100,7 @@ class PoseLandmarkerHelper(
                 )
             }
             
-            poseLandmarkerListener?.onResults(landmarks, finishTimeMs)
+            poseLandmarkerListener?.onResults(landmarks, rawLandmarks, finishTimeMs)
         }
     }
 
@@ -120,7 +125,18 @@ class PoseLandmarkerHelper(
      * Listener interface for pose detection results
      */
     interface LandmarkerListener {
-        fun onResults(landmarks: List<PoseLandmark>, inferenceTime: Long)
+        /**
+         * Called when pose landmarks are detected
+         * @param landmarks Converted PoseLandmark list for local processing
+         * @param rawLandmarks Raw MediaPipe NormalizedLandmark list for server communication
+         * @param inferenceTime Time taken for inference in milliseconds
+         */
+        fun onResults(
+            landmarks: List<PoseLandmark>, 
+            rawLandmarks: List<NormalizedLandmark>,
+            inferenceTime: Long
+        )
         fun onError(error: String)
     }
 }
+

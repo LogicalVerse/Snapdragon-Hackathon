@@ -70,6 +70,10 @@ dependencies {
     // MediaPipe for pose estimation
     implementation("com.google.mediapipe:tasks-vision:0.10.14")
     
+    // OkHttp for WebSocket communication with Python backend
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.google.code.gson:gson:2.10.1")
+    
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

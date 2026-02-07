@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.example.myapplication.data.WorkoutPreferences
+import com.example.myapplication.pose.WorkoutSummary
 import com.example.myapplication.ui.screens.ActiveWorkoutScreen
 import com.example.myapplication.ui.screens.AnalysisScreen
 import com.example.myapplication.ui.screens.CameraSetupScreen
@@ -60,6 +61,12 @@ fun FormlyApp() {
     
     var currentScreen by remember { mutableStateOf(Screen.HOME) }
     var isWorkoutStarted by remember { mutableStateOf(false) }
+    var selectedExerciseId by remember { mutableStateOf("squats") }
+    var selectedExerciseName by remember { mutableStateOf("Squats") }
+    
+    // Store workout summary and video for analysis screen
+    var workoutSummary by remember { mutableStateOf(WorkoutSummary()) }
+    var lastVideoUri by remember { mutableStateOf<String?>(null) }
 
     when (currentScreen) {
         Screen.HOME -> {
@@ -69,6 +76,8 @@ fun FormlyApp() {
                     // Record workout when exercise is clicked
                     workoutPrefs.recordWorkout()
                     isWorkoutStarted = false  // Reset when starting fresh
+                    selectedExerciseId = exercise.id
+                    selectedExerciseName = exercise.name
                     currentScreen = Screen.CAMERA_SETUP
                 },
                 onSettingsClick = {
@@ -79,6 +88,7 @@ fun FormlyApp() {
         Screen.CAMERA_SETUP -> {
             CameraSetupScreen(
                 isWorkoutStarted = isWorkoutStarted,
+                exerciseId = selectedExerciseId,
                 onBackPressed = {
                     isWorkoutStarted = false
                     currentScreen = Screen.HOME
@@ -86,7 +96,9 @@ fun FormlyApp() {
                 onStartWorkout = {
                     isWorkoutStarted = true
                 },
-                onPauseWorkout = {
+                onPauseWorkout = { summary, videoUri ->
+                    workoutSummary = summary
+                    lastVideoUri = videoUri
                     currentScreen = Screen.ANALYSIS
                 }
             )
@@ -112,7 +124,10 @@ fun FormlyApp() {
                 onEndWorkout = {
                     isWorkoutStarted = false
                     currentScreen = Screen.HOME
-                }
+                },
+                exerciseName = selectedExerciseName,
+                summary = workoutSummary,
+                videoUri = lastVideoUri
             )
         }
         Screen.SETTINGS -> {

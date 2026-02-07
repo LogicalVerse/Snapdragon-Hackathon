@@ -122,6 +122,11 @@ class PoseAnalyzer {
                     feedback = "Holding at depth..."
                 }
             }
+            else -> {
+                // Handle new states (S1, S2, S3) if they ever leak into local analysis
+                // For now, local analysis only uses UP/DOWN
+                currentState = SquatState.UP
+            }
         }
         
         } else {
@@ -196,7 +201,7 @@ class PoseAnalyzer {
             bestDepthAngle = bestAngle,
             formScore = formScore,
             totalDurationSeconds = durationSeconds,
-            repDepthAngles = repDepthAngles.toList()
+            depthAngles = repDepthAngles.toList()
         )
     }
     

@@ -28,16 +28,23 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import com.example.myapplication.pose.AnalysisResult
-import com.example.myapplication.pose.PoseAnalyzer
+import com.example.myapplication.pose.ExerciseTrainer
+import com.example.myapplication.pose.ExerciseTrainerFactory
 import com.example.myapplication.pose.PoseLandmark
 import com.example.myapplication.pose.PoseLandmarkerHelper
+import com.example.myapplication.pose.WorkoutMode
 import com.example.myapplication.pose.WorkoutSummary
+import com.google.mediapipe.tasks.components.containers.NormalizedLandmark
 import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
+/**
+ * Manages camera, video recording, and on-device pose analysis.
+ * All exercise analysis is performed locally using ExerciseTrainer implementations.
+ */
 class CameraManager(private val context: Context) : PoseLandmarkerHelper.LandmarkerListener {
     
     private var cameraProvider: ProcessCameraProvider? = null
@@ -50,7 +57,10 @@ class CameraManager(private val context: Context) : PoseLandmarkerHelper.Landmar
     
     // MediaPipe Pose Landmarker
     private var poseLandmarkerHelper: PoseLandmarkerHelper? = null
-    private val poseAnalyzer = PoseAnalyzer()
+    
+    // Exercise Trainer - handles all analysis locally
+    private var exerciseTrainer: ExerciseTrainer? = null
+    
     var isPoseEstimationEnabled = false
         private set
     
@@ -60,11 +70,20 @@ class CameraManager(private val context: Context) : PoseLandmarkerHelper.Landmar
     var isRecording = false
         private set
     
+    // Current workout configuration
+    var currentExerciseId = "squats"
+    var workoutMode = WorkoutMode.BEGINNER
+    
+    // Callbacks
     var onRecordingStateChanged: ((Boolean) -> Unit)? = null
     var onRecordingSaved: ((String) -> Unit)? = null
     var onError: ((String) -> Unit)? = null
     var onPoseDetected: ((List<PoseLandmark>) -> Unit)? = null
     var onAnalysisResult: ((AnalysisResult) -> Unit)? = null
+    
+    // Last recorded video URI for analysis screen
+    var lastRecordedVideoUri: String? = null
+        private set
     
     fun startCamera(
         lifecycleOwner: LifecycleOwner,
@@ -112,6 +131,7 @@ class CameraManager(private val context: Context) : PoseLandmarkerHelper.Landmar
             .also { analysis ->
                 analysis.setAnalyzer(analysisExecutor) { imageProxy ->
                     if (isPoseEstimationEnabled) {
+                        Log.d(TAG, "Processing frame - poseHelper: ${poseLandmarkerHelper != null}")
                         processFrame(imageProxy)
                     } else {
                         imageProxy.close()
@@ -172,6 +192,7 @@ class CameraManager(private val context: Context) : PoseLandmarkerHelper.Landmar
                         
                         if (!recordEvent.hasError()) {
                             val savedUri = recordEvent.outputResults.outputUri
+                            lastRecordedVideoUri = savedUri.toString()
                             onRecordingSaved?.invoke(savedUri.toString())
                         } else {
                             onError?.invoke("Recording failed: ${recordEvent.error}")
@@ -187,14 +208,69 @@ class CameraManager(private val context: Context) : PoseLandmarkerHelper.Landmar
     }
     
     /**
-     * Start pose estimation - initialize MediaPipe PoseLandmarker
+     * Stop recording and invoke callback with video URI when finalized.
      */
-    fun startPoseEstimation() {
-        if (poseLandmarkerHelper == null) {
-            poseLandmarkerHelper = PoseLandmarkerHelper(context, this)
+    fun stopRecordingWithCallback(onFinalized: (String?) -> Unit) {
+        if (recording == null) {
+            Log.d(TAG, "Recording is null, returning lastUri: $lastRecordedVideoUri")
+            onFinalized(lastRecordedVideoUri)
+            return
         }
+        
+        Log.d(TAG, "Stopping recording with callback...")
+        
+        // Store the callback and set it to be called when recording finalizes
+        val currentCallback = onRecordingSaved
+        onRecordingSaved = { uri ->
+            Log.d(TAG, "Recording saved successfully: $uri")
+            currentCallback?.invoke(uri)
+            lastRecordedVideoUri = uri
+            onFinalized(uri)
+        }
+        
+        // Also hook into onError to ensure we don't hang if recording fails
+        val currentErrorCallback = onError
+        onError = { error ->
+            Log.e(TAG, "Recording failed during stop: $error")
+            currentErrorCallback?.invoke(error)
+            onFinalized(null) // Callback with null to proceed
+        }
+        
+        try {
+            recording?.stop()
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Error stopping recording", e)
+            onFinalized(null)
+        }
+        recording = null
+    }
+    
+    /**
+     * Start pose estimation and analysis for the given exercise.
+     * 
+     * @param exerciseId The exercise to analyze (e.g., "squats", "pushup")
+     * @param mode Workout difficulty mode
+     */
+    fun startPoseEstimation(exerciseId: String = currentExerciseId, mode: WorkoutMode = workoutMode) {
+        Log.d(TAG, ">>> startPoseEstimation called - exerciseId: $exerciseId, mode: $mode")
+        
+        currentExerciseId = exerciseId
+        workoutMode = mode
+        
+        // Initialize MediaPipe if needed
+        if (poseLandmarkerHelper == null) {
+            Log.d(TAG, "Creating PoseLandmarkerHelper...")
+            poseLandmarkerHelper = PoseLandmarkerHelper(context, this)
+            Log.d(TAG, "PoseLandmarkerHelper created: ${poseLandmarkerHelper != null}")
+        }
+        
+        // Create the appropriate exercise trainer
+        Log.d(TAG, "Creating exercise trainer for: $exerciseId")
+        exerciseTrainer = ExerciseTrainerFactory.create(exerciseId, mode)
+        Log.d(TAG, "Exercise trainer created: ${exerciseTrainer?.exerciseName}")
+        
         isPoseEstimationEnabled = true
-        Log.d(TAG, "Pose estimation started")
+        Log.d(TAG, ">>> Pose estimation ENABLED - isPoseEstimationEnabled=$isPoseEstimationEnabled")
     }
     
     /**
@@ -206,6 +282,13 @@ class CameraManager(private val context: Context) : PoseLandmarkerHelper.Landmar
     }
     
     /**
+     * Get workout summary from the current exercise trainer.
+     */
+    fun getSummary(): WorkoutSummary {
+        return exerciseTrainer?.getSummary() ?: WorkoutSummary()
+    }
+    
+    /**
      * Process camera frame for pose estimation using MediaPipe
      */
     private fun processFrame(imageProxy: ImageProxy) {
@@ -213,8 +296,11 @@ class CameraManager(private val context: Context) : PoseLandmarkerHelper.Landmar
             val bitmap = imageProxyToBitmap(imageProxy)
             if (bitmap != null) {
                 val frameTime = SystemClock.uptimeMillis()
+                Log.d(TAG, "Sending frame to MediaPipe: ${bitmap.width}x${bitmap.height}")
                 poseLandmarkerHelper?.detectAsync(bitmap, frameTime)
                 bitmap.recycle()
+            } else {
+                Log.w(TAG, "Failed to convert imageProxy to bitmap")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Frame processing failed", e)
@@ -264,25 +350,58 @@ class CameraManager(private val context: Context) : PoseLandmarkerHelper.Landmar
     }
     
     // PoseLandmarkerHelper.LandmarkerListener implementation
-    override fun onResults(landmarks: List<PoseLandmark>, inferenceTime: Long) {
-        // Run pose analysis
-        val analysisResult = poseAnalyzer.analyzePose(landmarks)
+    override fun onResults(
+        landmarks: List<PoseLandmark>, 
+        rawLandmarks: List<NormalizedLandmark>,
+        inferenceTime: Long
+    ) {
+        Log.d(TAG, "onResults called - landmarks: ${landmarks.size}, trainer: ${exerciseTrainer != null}, poseEnabled: $isPoseEstimationEnabled")
         
+        // Notify UI about detected landmarks
         android.os.Handler(android.os.Looper.getMainLooper()).post {
             onPoseDetected?.invoke(landmarks)
-            onAnalysisResult?.invoke(analysisResult)
+        }
+        
+        // Perform on-device analysis using the exercise trainer
+        val trainer = exerciseTrainer
+        if (trainer != null) {
+            val analysisResult = trainer.analyze(landmarks)
+            Log.d(TAG, "Analysis result: repCount=${analysisResult.repCount}, feedback=${analysisResult.feedbackType}")
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                onAnalysisResult?.invoke(analysisResult)
+            }
+        } else {
+            Log.w(TAG, "exerciseTrainer is null, skipping analysis")
         }
     }
     
     /**
-     * Get workout summary for pause screen
+     * Get workout summary for pause/end screen
      */
-    fun getWorkoutSummary(): WorkoutSummary = poseAnalyzer.getWorkoutSummary()
+    fun getWorkoutSummary(): WorkoutSummary {
+        return exerciseTrainer?.getSummary() ?: WorkoutSummary()
+    }
     
     /**
-     * Reset analyzer for new workout
+     * Reset trainer for new workout
      */
-    fun resetAnalyzer() = poseAnalyzer.reset()
+    fun resetAnalyzer(newMode: WorkoutMode? = null) {
+        if (newMode != null) {
+            workoutMode = newMode
+        }
+        exerciseTrainer?.reset(workoutMode)
+    }
+    
+    /**
+     * Switch to a different exercise
+     */
+    fun setExercise(exerciseId: String) {
+        if (exerciseId != currentExerciseId) {
+            currentExerciseId = exerciseId
+            exerciseTrainer = ExerciseTrainerFactory.create(exerciseId, workoutMode)
+            Log.d(TAG, "Switched to exercise: $exerciseId")
+        }
+    }
     
     override fun onError(error: String) {
         Log.e(TAG, "Pose detection error: $error")
@@ -294,6 +413,7 @@ class CameraManager(private val context: Context) : PoseLandmarkerHelper.Landmar
         stopPoseEstimation()
         poseLandmarkerHelper?.close()
         poseLandmarkerHelper = null
+        exerciseTrainer = null
         cameraExecutor.shutdown()
         analysisExecutor.shutdown()
     }
