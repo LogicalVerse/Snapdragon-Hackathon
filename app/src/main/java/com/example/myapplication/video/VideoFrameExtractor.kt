@@ -168,17 +168,21 @@ class VideoFrameExtractor(private val context: Context) {
     /**
      * Load good form reference frames from assets.
      * These frames show CORRECT technique.
+     * 
+     * @param exerciseId The ID of the exercise (e.g., "squats", "pushups")
      */
-    fun loadGoodFormFrames(): List<String> {
-        return loadFramesFromAssetDir("squat_good_form")
+    fun loadGoodFormFrames(exerciseId: String = "squats"): List<String> {
+        return loadFramesFromAssetDir("${exerciseId}_good_form")
     }
     
     /**
      * Load bad form reference frames from assets.
      * These frames show INCORRECT technique to avoid.
+     * 
+     * @param exerciseId The ID of the exercise (e.g., "squats", "pushups")
      */
-    fun loadBadFormFrames(): List<String> {
-        return loadFramesFromAssetDir("squat_bad_form")
+    fun loadBadFormFrames(exerciseId: String = "squats"): List<String> {
+        return loadFramesFromAssetDir("${exerciseId}_bad_form")
     }
     
     /**

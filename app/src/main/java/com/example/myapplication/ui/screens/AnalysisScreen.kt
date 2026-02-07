@@ -68,6 +68,7 @@ fun AnalysisScreen(
     onResume: () -> Unit = {},
     onEndWorkout: () -> Unit = {},
     exerciseName: String = "Squats",
+    exerciseId: String = "squats",
     summary: WorkoutSummary = WorkoutSummary(),
     videoUri: String? = null
 ) {
@@ -150,12 +151,16 @@ fun AnalysisScreen(
             
             // AI Coaching Card (analyze video with Gemini)
             if (videoUri != null) {
+                Spacer(modifier = Modifier.height(Spacing.lg))
+                
                 AiCoachingCard(
                     videoUri = videoUri,
+                    exerciseName = exerciseName,
+                    exerciseId = exerciseId,
                     context = context
                 )
-                Spacer(modifier = Modifier.height(Spacing.lg))
             }
+            Spacer(modifier = Modifier.height(Spacing.lg))
             
             // Form Score Card
             FormScoreCard(
@@ -644,6 +649,8 @@ private fun RepDetailRow(rep: RepInfo) {
 @Composable
 fun AiCoachingCard(
     videoUri: String,
+    exerciseName: String,
+    exerciseId: String,
     context: android.content.Context,
     modifier: Modifier = Modifier
 ) {
@@ -668,12 +675,13 @@ fun AiCoachingCard(
             }
             
             feedbackState = AiFeedbackState.Loading
-            val result = geminiRepository.analyzeSquatForm(videoUri)
+            val result = geminiRepository.analyzeForm(videoUri, exerciseName, exerciseId)
             feedbackState = result.fold(
                 onSuccess = { AiFeedbackState.Success(it) },
                 onFailure = { AiFeedbackState.Error(it.message ?: "Analysis failed") }
             )
         } catch (e: Exception) {
+
             // Catch any uncaught exception to prevent crash
             android.util.Log.e("AiCoachingCard", "Analysis crashed", e)
             feedbackState = AiFeedbackState.Error("Oops! Analysis unavailable")

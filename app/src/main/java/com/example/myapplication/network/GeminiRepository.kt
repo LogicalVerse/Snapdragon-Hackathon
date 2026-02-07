@@ -21,13 +21,10 @@ class GeminiRepository(private val context: Context) {
     
     companion object {
         private const val TAG = "GeminiRepository"
-        private const val API_KEY = "AIzaSyBkAKYCgJ7I6veulBF3vxVIF21RHsXpkWM"
         
-        /**
-         * Build dynamic prompt based on what reference frames are available.
-         * This ensures the prompt matches the actual images being sent.
-         */
+        // Dynamic prompt builder based on available reference frames and exercise type
         private fun buildPrompt(
+            exerciseName: String,
             hasGoodFormFrames: Boolean,
             hasBadFormFrames: Boolean,
             goodCount: Int,
@@ -37,7 +34,7 @@ class GeminiRepository(private val context: Context) {
             val totalImages = goodCount + badCount + userCount
             
             return buildString {
-                appendLine("You are an expert fitness coach analyzing squat form.")
+                appendLine("You are an expert fitness coach analyzing $exerciseName form.")
                 appendLine()
                 appendLine("I am sending you $totalImages images:")
                 
@@ -63,6 +60,7 @@ class GeminiRepository(private val context: Context) {
                 appendLine("Be encouraging but honest. If form looks good, say so!")
             }
         }
+        private const val API_KEY = "AIzaSyBkAKYCgJ7I6veulBF3vxVIF21RHsXpkWM"
     }
     
     // Lazy initialization to prevent crashes during construction
@@ -111,32 +109,35 @@ class GeminiRepository(private val context: Context) {
     }
     
     /**
-     * Analyze user's squat form by comparing with professional reference.
+     * Analyze user's form by comparing with professional reference.
      * Uses memory-efficient processing to prevent OOM.
      * 
      * @param videoUri URI of the user's workout video
+     * @param exerciseName Name of the exercise (e.g. "Squats")
+     * @param exerciseId ID of the exercise (e.g. "squats") for loading assets
      * @return AI-generated feedback text, or error Result if analysis failed
      */
-    suspend fun analyzeSquatForm(videoUri: String): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun analyzeForm(
+        videoUri: String,
+        exerciseName: String,
+        exerciseId: String
+    ): Result<String> = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "=== Starting Gemini Analysis ===")
-            Log.d(TAG, "Video URI: $videoUri")
+            Log.d(TAG, "Starting $exerciseName analysis for video: $videoUri")
             
-            val extractor = frameExtractor
-            if (extractor == null) {
-                Log.e(TAG, "Frame extractor is null!")
-                return@withContext Result.failure(Exception("Video processor unavailable"))
-            }
+            val extractor = frameExtractor ?: return@withContext Result.failure(
+                IllegalStateException("VideoFrameExtractor not initialized")
+            )
             
             // Force GC before heavy operations
             System.gc()
             Log.d(TAG, "Memory before loading: ${getMemoryInfo()}")
             
             // Load good form reference frames
-            Log.d(TAG, "Loading good form frames...")
-            val goodFormFrames = extractor.loadGoodFormFrames()
+            Log.d(TAG, "Loading good form frames for $exerciseId...")
+            val goodFormFrames = extractor.loadGoodFormFrames(exerciseId)
             if (goodFormFrames.isEmpty()) {
-                Log.w(TAG, "No good form frames loaded, falling back to professional frames")
+                Log.w(TAG, "No good form frames loaded for $exerciseId.")
             }
             Log.d(TAG, "Loaded ${goodFormFrames.size} good form frames")
             
@@ -174,6 +175,7 @@ class GeminiRepository(private val context: Context) {
             
             // Build dynamic prompt based on what frames we have
             val prompt = buildPrompt(
+                exerciseName = exerciseName,
                 hasGoodFormFrames = goodFormFrames.isNotEmpty(),
                 hasBadFormFrames = badFormFrames.isNotEmpty(),
                 goodCount = goodFormFrames.size,

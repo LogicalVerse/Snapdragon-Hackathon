@@ -130,6 +130,7 @@ fun FormlyApp() {
                     currentScreen = Screen.HOME
                 },
                 exerciseName = selectedExerciseName,
+                exerciseId = selectedExerciseId,
                 summary = workoutSummary,
                 videoUri = lastVideoUri
             )
