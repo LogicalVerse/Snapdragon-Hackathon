@@ -1,7 +1,7 @@
 # 🏋️ Formly: AI-Powered Real-Time Fitness Coach
 
 
-> **Built for the Snapdragon Hackathon** - Transform your Snapdragon-powered device into an intelligent personal trainer with real-time pose detection and AI feedback.
+> **Built for the Snapdragon Hackathon** - An intelligent fitness companion built for the Snapdragon Hackathon that combines real-time exercise tracking with AI-powered form analysis. Whether you're working out at the gym or recovering through physiotherapy, this app provides instant feedback and guidance using advanced computer vision and AI.
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9-blue.svg)](https://kotlinlang.org)
 [![Android](https://img.shields.io/badge/Android-API%2031+-green.svg)](https://developer.android.com)
