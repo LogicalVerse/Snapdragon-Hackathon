@@ -1,8 +1,5 @@
 # 🏋️ Formly: AI-Powered Real-Time Fitness Coach
 
-<p align="center">
-  <img src="docs/banner.png" alt="Formly Banner" width="800"/>
-</p>
 
 > **Built for the Snapdragon Hackathon** - Transform your Snapdragon-powered device into an intelligent personal trainer with real-time pose detection and AI feedback.
 
