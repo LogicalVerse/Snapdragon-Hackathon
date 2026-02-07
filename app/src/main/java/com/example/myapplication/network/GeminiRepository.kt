@@ -25,15 +25,23 @@ class GeminiRepository(private val context: Context) {
         
         private const val COMPARISON_PROMPT = """You are an expert fitness coach analyzing squat form.
 
-Analyze the images I am sharing and give feedback ONLY on the pose shown in MY workout frames (the user's frames).
+I am sending you images in 3 groups:
+- GROUP 1 (first 6 images): GOOD FORM REFERENCE - Shows correct squat technique
+- GROUP 2 (next 6 images): BAD FORM REFERENCE - Shows common mistakes to avoid
+- GROUP 3 (last 6 images): MY WORKOUT - Frames from my actual squat workout
 
-Focus on:
-1. Depth - am I squatting deep enough?
-2. Back position - is my spine neutral or rounded?
-3. Knee tracking - are my knees tracking properly over my toes?
-4. Overall movement quality
+Compare my workout against BOTH references and provide:
 
-Keep your response SHORT and ENCOURAGING (2-3 sentences max). Start with what I'm doing well, then give ONE key improvement tip."""
+1. MATCHING GOOD FORM: What am I doing correctly like the good reference?
+2. SIMILAR TO BAD FORM: Am I making any mistakes shown in the bad reference?
+3. KEY FIX: One specific tip to improve
+
+Response format (keep SHORT - 3-4 sentences):
+✓ Good: [What matches good form]
+✗ Issue: [What resembles bad form, if any]
+💡 Tip: [One actionable improvement]
+
+Be encouraging but honest."""
     }
     
     // Lazy initialization to prevent crashes during construction
@@ -103,18 +111,25 @@ Keep your response SHORT and ENCOURAGING (2-3 sentences max). Start with what I'
             System.gc()
             Log.d(TAG, "Memory before loading: ${getMemoryInfo()}")
             
-            // Load professional reference frames
-            Log.d(TAG, "Loading professional frames...")
-            val professionalFrames = extractor.loadProfessionalFrames()
-            if (professionalFrames.isEmpty()) {
-                Log.e(TAG, "No professional frames loaded!")
-                return@withContext Result.failure(Exception("Failed to load reference frames"))
+            // Load good form reference frames
+            Log.d(TAG, "Loading good form frames...")
+            val goodFormFrames = extractor.loadGoodFormFrames()
+            if (goodFormFrames.isEmpty()) {
+                Log.w(TAG, "No good form frames loaded, falling back to professional frames")
             }
-            Log.d(TAG, "Loaded ${professionalFrames.size} professional frames")
+            Log.d(TAG, "Loaded ${goodFormFrames.size} good form frames")
             
             // Force GC between operations
             System.gc()
-            Log.d(TAG, "Memory after professional frames: ${getMemoryInfo()}")
+            
+            // Load bad form reference frames
+            Log.d(TAG, "Loading bad form frames...")
+            val badFormFrames = extractor.loadBadFormFrames()
+            Log.d(TAG, "Loaded ${badFormFrames.size} bad form frames")
+            
+            // Force GC between operations
+            System.gc()
+            Log.d(TAG, "Memory after reference frames: ${getMemoryInfo()}")
             
             // Extract user's frames from video
             Log.d(TAG, "Extracting user frames...")
@@ -130,7 +145,7 @@ Keep your response SHORT and ENCOURAGING (2-3 sentences max). Start with what I'
             Log.d(TAG, "Memory after user frames: ${getMemoryInfo()}")
             
             // Calculate total payload size for logging
-            val totalChars = professionalFrames.sumOf { it.length } + userFrames.sumOf { it.length }
+            val totalChars = goodFormFrames.sumOf { it.length } + badFormFrames.sumOf { it.length } + userFrames.sumOf { it.length }
             Log.d(TAG, "Total payload size: ~${totalChars / 1024}KB base64 data")
             
             // Build request parts
@@ -139,19 +154,25 @@ Keep your response SHORT and ENCOURAGING (2-3 sentences max). Start with what I'
             // Add the prompt
             parts.add(textPart(COMPARISON_PROMPT))
             
-            // Add professional frames (first 6)
-            professionalFrames.forEachIndexed { index, base64 ->
-                Log.d(TAG, "Adding professional frame ${index + 1}: ${base64.length} chars")
+            // Add good form frames (GROUP 1 - first 6)
+            goodFormFrames.forEachIndexed { index, base64 ->
+                Log.d(TAG, "Adding good form frame ${index + 1}: ${base64.length} chars")
                 parts.add(imagePart(base64))
             }
             
-            // Add user frames (last 6)
+            // Add bad form frames (GROUP 2 - next 6)
+            badFormFrames.forEachIndexed { index, base64 ->
+                Log.d(TAG, "Adding bad form frame ${index + 1}: ${base64.length} chars")
+                parts.add(imagePart(base64))
+            }
+            
+            // Add user frames (GROUP 3 - last 6)
             userFrames.forEachIndexed { index, base64 ->
                 Log.d(TAG, "Adding user frame ${index + 1}: ${base64.length} chars")
                 parts.add(imagePart(base64))
             }
             
-            Log.d(TAG, "Built request with ${parts.size} parts")
+            Log.d(TAG, "Built request with ${parts.size} parts (${goodFormFrames.size} good + ${badFormFrames.size} bad + ${userFrames.size} user)")
             Log.d(TAG, "Memory before API call: ${getMemoryInfo()}")
             
             // Make API request

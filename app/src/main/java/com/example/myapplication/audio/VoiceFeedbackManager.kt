@@ -11,11 +11,13 @@ import com.example.myapplication.pose.FeedbackType
 import java.util.Locale
 
 /**
- * Simplified voice feedback manager for hands-free workout coaching.
+ * Voice feedback manager for hands-free workout coaching.
  * 
- * Speaks only:
- * - "Good form" when doing correct pose
- * - "Correct your form" when doing incorrect pose  
+ * Provides specific voice commands for different form issues:
+ * - "Good form" for correct pose
+ * - "Keep your back straight" for back issues
+ * - "Go deeper" for depth issues
+ * - "Side pose" for camera angle issues
  * - Rep numbers: "1", "2", "3", etc.
  */
 class VoiceFeedbackManager(context: Context) {
@@ -28,11 +30,11 @@ class VoiceFeedbackManager(context: Context) {
     // Main thread handler for TTS calls
     private val mainHandler = Handler(Looper.getMainLooper())
     
-    // Minimum interval between form feedback to avoid spam (3 seconds)
-    private val formFeedbackIntervalMs = 3000L
+    // Minimum interval between form feedback (1.5 seconds)
+    private val formFeedbackIntervalMs = 1500L
     
     // Track state
-    private var isCurrentFormGood = true  // Assume good until proven otherwise
+    private var lastFeedbackType: FeedbackType? = null
     private var lastRepCount = 0
     
     // Audio parameters for TTS
@@ -50,7 +52,7 @@ class VoiceFeedbackManager(context: Context) {
                         Log.e(TAG, "TTS Language not supported, result: $langResult")
                         return@post
                     }
-                    tts?.setSpeechRate(1.1f)  // Slightly faster
+                    tts?.setSpeechRate(1.15f)  // Faster speech
                     tts?.setPitch(1.0f)
                     isInitialized = true
                     Log.d(TAG, "TTS initialized successfully")
@@ -92,8 +94,8 @@ class VoiceFeedbackManager(context: Context) {
     }
     
     /**
-     * Simplified feedback based on FeedbackType.
-     * Only says "Good form" or "Correct your form"
+     * Speak feedback based on FeedbackType.
+     * Uses specific voice commands for each issue type.
      */
     fun speakFeedback(feedbackType: FeedbackType) {
         Log.d(TAG, "speakFeedback() called: $feedbackType")
@@ -105,28 +107,70 @@ class VoiceFeedbackManager(context: Context) {
         
         // Skip these - no action needed
         if (feedbackType == FeedbackType.NONE || feedbackType == FeedbackType.READY) {
+            // Reset tracking when no feedback
+            if (feedbackType == FeedbackType.NONE) {
+                lastFeedbackType = null
+            }
             return
         }
         
         val currentTime = System.currentTimeMillis()
         val timeSinceLastFeedback = currentTime - lastSpeakTimeMs
         
-        // Determine if current form is good or bad
-        val isGoodForm = feedbackType == FeedbackType.GOOD_FORM || feedbackType == FeedbackType.REP_COMPLETE
-        
         // Only speak if:
-        // 1. Form state changed (good -> bad or bad -> good)
+        // 1. Feedback type changed
         // 2. OR enough time has passed since last feedback
-        if (isGoodForm != isCurrentFormGood || timeSinceLastFeedback >= formFeedbackIntervalMs) {
-            isCurrentFormGood = isGoodForm
+        if (feedbackType != lastFeedbackType || timeSinceLastFeedback >= formFeedbackIntervalMs) {
+            lastFeedbackType = feedbackType
             
-            if (isGoodForm) {
-                Log.d(TAG, ">>> Speaking: Good form")
-                speak("Good form", priority = true)
-            } else {
-                Log.d(TAG, ">>> Speaking: Correct your form")
-                speak("Correct your form", priority = false)
+            val message = getVoiceCommand(feedbackType)
+            if (message != null) {
+                val isPriority = feedbackType == FeedbackType.GOOD_FORM || feedbackType == FeedbackType.REP_COMPLETE
+                Log.d(TAG, ">>> Speaking: $message")
+                speak(message, priority = isPriority)
             }
+        }
+    }
+    
+    /**
+     * Get specific voice command for each feedback type.
+     * These are short, clear commands for workout coaching.
+     */
+    private fun getVoiceCommand(feedbackType: FeedbackType): String? {
+        return when (feedbackType) {
+            // Good form feedback
+            FeedbackType.GOOD_FORM -> "Good form"
+            FeedbackType.REP_COMPLETE -> "Good rep"
+            
+            // Squat feedback
+            FeedbackType.BEND_FORWARD -> "Lean forward"
+            FeedbackType.BEND_BACKWARDS -> "Keep your back straight"
+            FeedbackType.LOWER_HIPS -> "Go deeper"
+            FeedbackType.KNEE_OVER_TOES -> "Watch your knees"
+            FeedbackType.DEEP_SQUAT -> "Too deep"
+            
+            // Push-up feedback
+            FeedbackType.HIPS_TOO_HIGH -> "Lower your hips"
+            FeedbackType.HIPS_TOO_LOW -> "Raise your hips"
+            FeedbackType.ARMS_NOT_LOCKED -> "Extend your arms"
+            FeedbackType.ELBOWS_FLARED -> "Tuck your elbows"
+            
+            // Deadlift feedback
+            FeedbackType.ROUND_BACK -> "Keep your back straight"
+            FeedbackType.HIPS_TOO_EARLY -> "Hips too fast"
+            FeedbackType.BAR_AWAY -> "Keep bar close"
+            
+            // Bench/Row feedback
+            FeedbackType.ELBOWS_TOO_WIDE -> "Tuck elbows in"
+            FeedbackType.INCOMPLETE_LOCKOUT -> "Lock out fully"
+            FeedbackType.MOMENTUM -> "Control the weight"
+            
+            // Camera/Position feedback
+            FeedbackType.FRONTAL_WARNING -> "Side pose please"
+            FeedbackType.POSITION_BODY -> "Show full body"
+            
+            // Skip these
+            FeedbackType.NONE, FeedbackType.READY -> null
         }
     }
     
@@ -156,7 +200,7 @@ class VoiceFeedbackManager(context: Context) {
      * Reset feedback tracking (for new workout).
      */
     fun reset() {
-        isCurrentFormGood = true
+        lastFeedbackType = null
         lastRepCount = 0
         lastSpokenMessage = null
         lastSpeakTimeMs = 0L

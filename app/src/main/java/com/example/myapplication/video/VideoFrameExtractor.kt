@@ -166,6 +166,67 @@ class VideoFrameExtractor(private val context: Context) {
     }
     
     /**
+     * Load good form reference frames from assets.
+     * These frames show CORRECT technique.
+     */
+    fun loadGoodFormFrames(): List<String> {
+        return loadFramesFromAssetDir("squat_good_form")
+    }
+    
+    /**
+     * Load bad form reference frames from assets.
+     * These frames show INCORRECT technique to avoid.
+     */
+    fun loadBadFormFrames(): List<String> {
+        return loadFramesFromAssetDir("squat_bad_form")
+    }
+    
+    /**
+     * Load frames from a specific asset directory.
+     */
+    private fun loadFramesFromAssetDir(assetDir: String): List<String> {
+        val frames = mutableListOf<String>()
+        
+        try {
+            Log.d(TAG, "=== Loading frames from $assetDir ===")
+            
+            val files = context.assets.list(assetDir) ?: emptyArray()
+            Log.d(TAG, "Found ${files.size} files in $assetDir")
+            
+            if (files.isEmpty()) {
+                Log.w(TAG, "No files found in $assetDir")
+                return emptyList()
+            }
+            
+            // Sort files to ensure consistent ordering
+            files.sorted().forEachIndexed { index, fileName ->
+                try {
+                    Log.d(TAG, "Loading frame ${index + 1}: $fileName")
+                    
+                    val base64 = loadAndCompressAsset("$assetDir/$fileName")
+                    if (base64 != null) {
+                        frames.add(base64)
+                        Log.d(TAG, "Frame ${index + 1}: ${base64.length} chars")
+                    } else {
+                        Log.w(TAG, "Failed to load: $fileName")
+                    }
+                    
+                    // Force GC between frames
+                    System.gc()
+                    
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error loading $fileName: ${e.message}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load frames from $assetDir: ${e.message}", e)
+        }
+        
+        Log.d(TAG, "=== Loaded ${frames.size} frames from $assetDir ===")
+        return frames
+    }
+    
+    /**
      * Load asset, decode, resize, and compress to base64.
      */
     private fun loadAndCompressAsset(assetPath: String): String? {
