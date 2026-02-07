@@ -59,6 +59,9 @@ fun FormlyApp() {
     val context = LocalContext.current
     val workoutPrefs = remember { WorkoutPreferences(context) }
     
+    // Initialize VoiceFeedbackManager at app level so TTS is ready by the time workout starts
+    val voiceFeedbackManager = remember { com.example.myapplication.audio.VoiceFeedbackManager(context) }
+    
     var currentScreen by remember { mutableStateOf(Screen.HOME) }
     var isWorkoutStarted by remember { mutableStateOf(false) }
     var selectedExerciseId by remember { mutableStateOf("squats") }
@@ -87,6 +90,7 @@ fun FormlyApp() {
         }
         Screen.CAMERA_SETUP -> {
             CameraSetupScreen(
+                voiceFeedbackManager = voiceFeedbackManager,
                 isWorkoutStarted = isWorkoutStarted,
                 exerciseId = selectedExerciseId,
                 onBackPressed = {

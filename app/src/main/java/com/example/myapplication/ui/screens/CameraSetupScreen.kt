@@ -47,6 +47,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -95,6 +96,7 @@ import com.google.accompanist.permissions.shouldShowRationale
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun CameraSetupScreen(
+    voiceFeedbackManager: VoiceFeedbackManager,
     isWorkoutStarted: Boolean = false,
     exerciseId: String = "squats",
     onBackPressed: () -> Unit = {},
@@ -111,9 +113,6 @@ fun CameraSetupScreen(
     
     // Camera manager
     val cameraManager = remember { CameraManager(context) }
-    
-    // Voice feedback manager - created once per screen instance
-    val voiceFeedbackManager = remember { VoiceFeedbackManager(context) }
     
     // Session counter - increments each time screen is displayed to force effect re-runs
     // This ensures recording/pose restart even when isWorkoutStarted doesn't change (resume flow)
@@ -143,6 +142,9 @@ fun CameraSetupScreen(
         }
     }
     
+    // Capture current workout state for callbacks
+    val currentIsWorkoutStarted by rememberUpdatedState(isWorkoutStarted)
+    
     // Setup camera callbacks
     LaunchedEffect(Unit) {
         cameraManager.onRecordingSaved = { message ->
@@ -157,8 +159,8 @@ fun CameraSetupScreen(
         cameraManager.onAnalysisResult = { result ->
             analysisResult = result
             
-            // Voice feedback
-            if (isWorkoutStarted && result != null) {
+            // Voice feedback - use updated state
+            if (currentIsWorkoutStarted && result != null) {
                 // Announce rep count changes
                 val newRepCount = result.repCount
                 if (newRepCount > lastRepCount) {
@@ -215,7 +217,7 @@ fun CameraSetupScreen(
     DisposableEffect(Unit) {
         onDispose {
             cameraManager.shutdown()
-            voiceFeedbackManager.shutdown()
+            // VoiceFeedbackManager is now app-scoped, do not shutdown here
         }
     }
     

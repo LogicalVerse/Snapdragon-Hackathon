@@ -30,6 +30,9 @@ class VoiceFeedbackManager(context: Context) {
     // Main thread handler for TTS calls
     private val mainHandler = Handler(Looper.getMainLooper())
     
+    // Queue for messages that arrive before TTS is initialized
+    private val pendingMessages = mutableListOf<String>()
+    
     // Minimum interval between form feedback (1.5 seconds)
     private val formFeedbackIntervalMs = 1500L
     
@@ -57,8 +60,17 @@ class VoiceFeedbackManager(context: Context) {
                     isInitialized = true
                     Log.d(TAG, "TTS initialized successfully")
                     
+                    // Speak any pending messages that were queued before init
+                    if (pendingMessages.isNotEmpty()) {
+                        Log.d(TAG, "Speaking ${pendingMessages.size} queued messages")
+                        pendingMessages.forEach { msg ->
+                            speakInternal(msg, false)
+                        }
+                        pendingMessages.clear()
+                    }
+                    
                     // Speak ready message
-                    speak("Ready")
+                    speakInternal("Ready", false)
                 } else {
                     Log.e(TAG, "TTS initialization failed with status: $status")
                 }
@@ -67,16 +79,31 @@ class VoiceFeedbackManager(context: Context) {
     }
     
     /**
-     * Speak a message.
+     * Speak a message. If TTS is not yet initialized, queue the message for later.
      */
     private fun speak(message: String, priority: Boolean = false) {
         Log.d(TAG, "speak() called: '$message', initialized=$isInitialized")
         
-        if (!isInitialized || message.isBlank()) {
-            Log.w(TAG, "TTS not ready or message blank")
+        if (message.isBlank()) {
+            Log.w(TAG, "Message blank, ignoring")
             return
         }
         
+        // If TTS not ready yet, queue the message for when it initializes
+        if (!isInitialized) {
+            Log.d(TAG, "TTS not ready, queuing message: '$message'")
+            pendingMessages.add(message)
+            return
+        }
+        
+        speakInternal(message, priority)
+    }
+    
+    /**
+     * Internal speak function that actually calls TTS.
+     * Only call this when isInitialized is true.
+     */
+    private fun speakInternal(message: String, priority: Boolean) {
         val queueMode = if (priority) {
             TextToSpeech.QUEUE_FLUSH
         } else {
