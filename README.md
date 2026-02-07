@@ -6,7 +6,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9-blue.svg)](https://kotlinlang.org)
 [![Android](https://img.shields.io/badge/Android-API%2031+-green.svg)](https://developer.android.com)
 [![Gemini](https://img.shields.io/badge/Gemini-3%20Flash-orange.svg)](https://ai.google.dev)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-AGPL-3.0.svg)](LICENSE)
 
 ---
 
