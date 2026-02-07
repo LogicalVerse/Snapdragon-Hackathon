@@ -101,9 +101,7 @@ GEMINI_API_KEY=your_api_key_here
 | Exercise | Detection | AI Analysis | Voice Feedback |
 |----------|-----------|-------------|----------------|
 | Squats | ✅ Full | ✅ Full | ✅ Full |
-| Push-ups | ✅ Full | 🔄 Coming | ✅ Full |
-| Lunges | ✅ Full | 🔄 Coming | ✅ Full |
-| Deadlifts | ✅ Full | 🔄 Coming | ✅ Full |
+| Bicep Curls | ✅ Full | ✅ Full | ✅ Full |
 
 ---
 
