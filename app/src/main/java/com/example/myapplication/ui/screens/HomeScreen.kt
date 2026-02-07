@@ -162,12 +162,20 @@ fun FormlyTopBar(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             // App Logo/Name
-            Text(
-                text = "Formly",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = ElectricGreen
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(id = com.example.myapplication.R.drawable.ic_logo),
+                    contentDescription = "Formly Logo",
+                    modifier = Modifier.size(40.dp)
+                )
+                Spacer(modifier = Modifier.width(Spacing.sm))
+                Text(
+                    text = "Formly",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = ElectricGreen
+                )
+            }
 
             // Settings Button
             IconButton(

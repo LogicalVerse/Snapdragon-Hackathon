@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Counter App</string>
+    <string name="app_name">Formly</string>
     <string name="action_settings">Settings</string>
     <string name="increase">Increase</string>
     <string name="decrease">Decrease</string>

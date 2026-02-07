@@ -60,7 +60,7 @@ class GeminiRepository(private val context: Context) {
                 appendLine("Be encouraging but honest. If form looks good, say so!")
             }
         }
-        private const val API_KEY = "AIzaSyBkAKYCgJ7I6veulBF3vxVIF21RHsXpkWM"
+        private const val API_KEY = "AIzaSyCxCzyLeAKK4Kh1QHgHg7srX5Ump8Qt5Zo"
     }
     
     // Lazy initialization to prevent crashes during construction
