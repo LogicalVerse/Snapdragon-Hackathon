@@ -3,7 +3,7 @@
 
 > **Built for the Snapdragon Hackathon** - An intelligent fitness companion built for the Snapdragon Hackathon that combines real-time exercise tracking with AI-powered form analysis. Whether you're working out at the gym or recovering through physiotherapy, this app provides instant feedback and guidance using advanced computer vision and AI.
 
-[![Kotlin](https://img.shields.io/badge/Kotlin-1.9-blue.svg)](https://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/Kotlin-1.9-blue.svg)](https://kotlinlang.org) 
 [![Android](https://img.shields.io/badge/Android-API%2031+-green.svg)](https://developer.android.com)
 [![Gemini](https://img.shields.io/badge/Gemini-3%20Flash-orange.svg)](https://ai.google.dev)
 [![License](https://img.shields.io/badge/AGPL-3.0-License.svg)](LICENSE)
